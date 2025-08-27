@@ -53,6 +53,10 @@ jobs:
             systemctl enable docker
           fi
           
+          # Configure firewall for port ${{ env.APP_PORT }}
+          echo '🔥 Configurando firewall...'
+          ufw allow ${{ env.APP_PORT }}/tcp || iptables -A INPUT -p tcp --dport ${{ env.APP_PORT }} -j ACCEPT || true
+          
           # Stop existing container
           docker stop ${{ env.CONTAINER_NAME }} 2>/dev/null || true
           docker rm ${{ env.CONTAINER_NAME }} 2>/dev/null || true
@@ -63,19 +67,39 @@ jobs:
           # Run container
           docker run -d \
             --name ${{ env.CONTAINER_NAME }} \
-            -p ${{ env.APP_PORT }}:5000 \
+            -p 0.0.0.0:${{ env.APP_PORT }}:5000 \
             --restart unless-stopped \
             -v /opt/postal/config:/config \
             -v /opt/postal/data:/opt/postal/data \
             ${{ env.IMAGE_NAME }}
           
           # Wait and test
-          sleep 10
+          sleep 15
+          echo '🔍 Testando container...'
           if docker ps | grep -q ${{ env.CONTAINER_NAME }}; then
-            echo '✅ Deploy successful'
+            echo '✅ Container rodando:'
             docker ps | grep ${{ env.CONTAINER_NAME }}
+            
+            # Test local connectivity
+            echo '🔍 Testando conectividade local...'
+            if curl -f -s --connect-timeout 5 http://localhost:${{ env.APP_PORT }}/ >/dev/null 2>&1; then
+              echo '✅ Aplicação respondendo localmente'
+            else
+              echo '⚠️ Aplicação não responde localmente'
+              echo '📋 Logs do container:'
+              docker logs ${{ env.CONTAINER_NAME }} --tail 20 2>&1 || true
+            fi
+            
+            # Check port binding
+            echo '🔍 Verificando binding da porta...'
+            netstat -tlnp | grep :${{ env.APP_PORT }} || echo 'Porta não encontrada no netstat'
+            
+            # Check processes
+            echo '🔍 Processos no container:'
+            docker exec ${{ env.CONTAINER_NAME }} ps aux || echo 'Não foi possível listar processos'
+            
           else
-            echo '❌ Deploy failed'
+            echo '❌ Deploy failed - Container não está rodando'
             docker logs ${{ env.CONTAINER_NAME }} 2>&1 || true
             exit 1
           fi
