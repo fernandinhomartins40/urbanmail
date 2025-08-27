@@ -41,6 +41,7 @@ RUN bundle install
 # Copy the application (and set permissions)
 COPY --chmod=755 ./docker/wait-for.sh /docker-entrypoint.sh
 COPY --chown=postal . .
+RUN chmod +x bin/*
 
 # Export the version
 ARG VERSION
