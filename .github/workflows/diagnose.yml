@@ -1,0 +1,127 @@
+name: 🔍 Diagnóstico VPS
+
+on:
+  workflow_dispatch:
+
+env:
+  VPS_HOST: '72.60.10.112'
+  VPS_USER: 'root'
+  APP_DIR: '/opt/postal'
+  APP_PORT: '5000'
+  CONTAINER_NAME: 'postal'
+
+jobs:
+  diagnose:
+    name: 🔍 Diagnóstico Completo
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 🔑 Setup SSH
+      run: |
+        sudo apt-get update -qq && sudo apt-get install -y sshpass
+        mkdir -p ~/.ssh && chmod 700 ~/.ssh
+        ssh-keyscan -H ${{ env.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+    - name: 🔍 Diagnóstico Completo da VPS
+      run: |
+        sshpass -p "${{ secrets.VPS_PASSWORD }}" ssh -o StrictHostKeyChecking=no ${{ env.VPS_USER }}@${{ env.VPS_HOST }} "
+          echo '=========================='
+          echo '🔍 DIAGNÓSTICO COMPLETO VPS'
+          echo '=========================='
+          echo ''
+          
+          echo '=== 1. INFORMAÇÕES DO SISTEMA ==='
+          echo 'OS Info:'
+          cat /etc/os-release | head -3
+          echo ''
+          echo 'Uptime:'
+          uptime
+          echo ''
+          echo 'Memória:'
+          free -h
+          echo ''
+          echo 'Espaço em disco:'
+          df -h /
+          echo ''
+          
+          echo '=== 2. STATUS DO DOCKER ==='
+          if command -v docker &> /dev/null; then
+            echo '✅ Docker instalado'
+            docker --version
+            echo ''
+            echo 'Status do serviço Docker:'
+            systemctl is-active docker
+            echo ''
+            echo 'Containers rodando:'
+            docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}\t{{.Image}}'
+            echo ''
+            echo 'Todas as imagens:'
+            docker images
+          else
+            echo '❌ Docker não encontrado!'
+          fi
+          echo ''
+          
+          echo '=== 3. STATUS DO CONTAINER POSTAL ==='
+          if docker ps -a | grep -q '${{ env.CONTAINER_NAME }}'; then
+            echo 'Container encontrado:'
+            docker ps -a | grep '${{ env.CONTAINER_NAME }}'
+            echo ''
+            echo 'Logs do container (últimas 30 linhas):'
+            docker logs ${{ env.CONTAINER_NAME }} --tail 30 2>&1
+            echo ''
+            if docker ps | grep -q '${{ env.CONTAINER_NAME }}'; then
+              echo 'Processos no container:'
+              docker exec ${{ env.CONTAINER_NAME }} ps aux 2>/dev/null || echo 'Falha ao listar processos'
+            fi
+          else
+            echo '❌ Container ${{ env.CONTAINER_NAME }} não encontrado!'
+          fi
+          echo ''
+          
+          echo '=== 4. CONFIGURAÇÃO DE REDE ==='
+          echo 'Portas abertas (netstat):'
+          netstat -tlnp | grep ':${{ env.APP_PORT }}' || echo 'Porta ${{ env.APP_PORT }} não encontrada'
+          echo ''
+          echo 'Todas as portas TCP abertas:'
+          netstat -tlnp | head -10
+          echo ''
+          echo 'Teste local da porta:'
+          curl -v --connect-timeout 5 http://localhost:${{ env.APP_PORT }}/ 2>&1 | head -10 || echo 'Conexão local falhou'
+          echo ''
+          
+          echo '=== 5. FIREWALL E IPTABLES ==='
+          echo 'Status do UFW:'
+          ufw status || echo 'UFW não disponível'
+          echo ''
+          echo 'Regras iptables INPUT:'
+          iptables -L INPUT -n --line-numbers | head -10
+          echo ''
+          echo 'Regras iptables para porta ${{ env.APP_PORT }}:'
+          iptables -L -n | grep ${{ env.APP_PORT }} || echo 'Nenhuma regra específica para porta ${{ env.APP_PORT }}'
+          echo ''
+          
+          echo '=== 6. APLICAÇÃO POSTAL ==='
+          echo 'Diretório da aplicação:'
+          ls -la ${{ env.APP_DIR }}/ 2>/dev/null || echo 'Diretório ${{ env.APP_DIR }} não encontrado'
+          echo ''
+          if [ -f '${{ env.APP_DIR }}/Dockerfile' ]; then
+            echo 'Dockerfile encontrado:'
+            head -10 ${{ env.APP_DIR }}/Dockerfile
+          else
+            echo 'Dockerfile não encontrado em ${{ env.APP_DIR }}'
+          fi
+          echo ''
+          
+          echo '=== 7. CONECTIVIDADE EXTERNA ==='
+          echo 'Testando conectividade externa (porta 80):'
+          curl -I --connect-timeout 5 http://google.com 2>&1 | head -3 || echo 'Conectividade externa limitada'
+          echo ''
+          echo 'Interface de rede:'
+          ip addr show | grep -E 'inet.*global' || echo 'IP não encontrado'
+          echo ''
+          
+          echo '=========================='
+          echo '🏁 DIAGNÓSTICO CONCLUÍDO'
+          echo '=========================='
+        "
