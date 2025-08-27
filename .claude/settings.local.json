@@ -1,0 +1,38 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add:*)",
+      "Bash(git remote add:*)",
+      "Bash(git push:*)",
+      "Bash(git commit:*)",
+      "Bash(cd:*)",
+      "Bash(npm install:*)",
+      "Bash(docker build:*)",
+      "Bash(docker run:*)",
+      "Bash(ssh:*)",
+      "Bash(npm ci:*)",
+      "Bash(npm run build:*)",
+      "Bash(node:*)",
+      "Bash(curl:*)",
+      "Bash(git reset:*)",
+      "Bash(gh workflow:*)",
+      "Bash(nslookup:*)",
+      "Bash(scp:*)",
+      "Bash(mkdir:*)",
+      "Bash(timeout 10s npm run dev)",
+      "Bash(timeout 8s npm run dev)",
+      "Bash(chmod:*)",
+      "Bash(cat:*)",
+      "Bash(npm run type-check:*)",
+      "Bash(npx tsc:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(sed:*)",
+      "Bash(npm start)",
+      "Bash(git check-ignore:*)",
+      "Bash(git init:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
